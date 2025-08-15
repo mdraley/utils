@@ -1,0 +1,5 @@
+.\wire-to-common.ps1 `
+  -RefsCsv "$PWD\references_report.csv" `
+  -Roots "C:\code\encore\schema\Service Level","C:\code\encore\schema\Root Level" `
+  -CommonNs "http://bank/common" `
+  -CommonPath "C:\code\encore\schema\Common\common.xsd"
