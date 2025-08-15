@@ -104,8 +104,7 @@ $conflicts = New-Object System.Collections.Generic.List[object]
 # --- Batch the work if requested ---
 $allNames = @($TypeNames)           # ensure array
 $total    = $allNames.Count
-$step     = [Math]::Max(1, ($BatchSize -as [int]))
-if ($BatchSize -le 0) { $step = $total }
+$step     = if ($BatchSize -gt 0) { [int]$BatchSize } else { $total }
 
 for ($i = 0; $i -lt $total; $i += $step) {
   $batch = $allNames[$i..([Math]::Min($i+$step-1, $total-1))]
@@ -123,13 +122,17 @@ for ($i = 0; $i -lt $total; $i += $step) {
     $tns   = Get-TargetNamespace -Doc $doc
 
     foreach ($t in $batch) {
-      # Find full definitions
-      $ct = $doc.DocumentElement.SelectSingleNode("xsd:complexType[@name='$t']", $nsmgr)
+      # Find complexType definition
+      $ctList = $doc.DocumentElement.SelectNodes("xsd:complexType[@name='$t']", $nsmgr)
+      $ct     = if ($ctList -and $ctList.Count -gt 0) { $ctList.Item(0) } else { $null }
       if ($ct) {
         $definitions[$t] += @{ Kind="complex"; Xml=$ct.OuterXml; File=$file.FullName; Namespace=$tns }
         $details.Add([pscustomobject]@{ Type=$t; Kind="complexType"; Source=$file.FullName; Namespace=$tns })
       }
-      $st = $doc.DocumentElement.SelectSingleNode("xsd:simpleType[@name='$t']", $nsmgr)
+
+      # Find simpleType definition
+      $stList = $doc.DocumentElement.SelectNodes("xsd:simpleType[@name='$t']", $nsmgr)
+      $st     = if ($stList -and $stList.Count -gt 0) { $stList.Item(0) } else { $null }
       if ($st) {
         $definitions[$t] += @{ Kind="simple"; Xml=$st.OuterXml; File=$file.FullName; Namespace=$tns }
         $details.Add([pscustomobject]@{ Type=$t; Kind="simpleType";  Source=$file.FullName; Namespace=$tns })
@@ -176,8 +179,9 @@ for ($i = 0; $i -lt $total; $i += $step) {
 
     # Single canonical definition → ensure not already present, then append
     $chosen   = $byXml[0].Group[0]
-    $kindNode = "xsd:{0}Type[@name='{1}']" -f $chosen.Kind, $t
-    $existing = $commonRoot.SelectSingleNode($kindNode, $nsmgrCommon)
+    $lookup   = ("xsd:{0}Type[@name='{1}']" -f $chosen.Kind, $t)
+    $existingList = $commonRoot.SelectNodes($lookup, $nsmgrCommon)
+    $existing     = if ($existingList -and $existingList.Count -gt 0) { $existingList.Item(0) } else { $null }
     if (-not $existing) {
       [xml]$tmp = New-Object System.Xml.XmlDocument
       $tmp.LoadXml($chosen.Xml)

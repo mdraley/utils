@@ -1,8 +1,6 @@
-cd "C:\code\encore\schema\Common"
-
 .\extract-common-types.ps1 `
   -Roots @("C:\code\encore\schema\Service Level","C:\code\encore\schema\Root Level") `
   -TypeNamesCsv "C:\code\encore\schema\Common\common_candidates_batch1.csv" `
   -CommonOutDir "C:\code\encore\schema\Common" `
-  -CommonNamespace "http://bank/common" `
-  -BatchSize 20     # <-- optional; remove to process all at once
+  -CommonNamespace "http://arvest/common" `
+  -BatchSize 20
