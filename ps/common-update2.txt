@@ -5,3 +5,9 @@ cd C:\code\encore\schema
   -CommonNs  "http://arvest.com/Encore/Common" `
   -CommonPath "C:\code\encore\schema\Common\common.xsd" `
   -FixCommonAlso
+
+
+  # From anywhere
+powershell -ExecutionPolicy Bypass -File .\commonxsd-fix.ps1 `
+  -Common   "C:\code\encore\schema\Common\common.xsd" `
+  -CommonNs "http://arvest.com/Encore/Common"
