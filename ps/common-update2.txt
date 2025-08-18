@@ -11,3 +11,15 @@ cd C:\code\encore\schema
 powershell -ExecutionPolicy Bypass -File .\commonxsd-fix.ps1 `
   -Common   "C:\code\encore\schema\Common\common.xsd" `
   -CommonNs "http://arvest.com/Encore/Common"
+
+
+  powershell -ExecutionPolicy Bypass -File .\promote-shared-types.ps1 `
+  -Roots  'C:\code\encore\schema\Service','C:\code\encore\schema\Root' `
+  -CommonPath 'C:\code\encore\schema\Common\common.xsd' `
+  -CommonNs 'http://arvest.com/Encore/Common' `
+  -OnlyTypes 'StatusType','AcctBasicType','BankIdType'
+
+  powershell -ExecutionPolicy Bypass -File .\promote-shared-types.ps1 `
+  -Roots  'C:\code\encore\schema\Service','C:\code\encore\schema\Root' `
+  -CommonPath 'C:\code\encore\schema\Common\common.xsd' `
+  -CommonNs 'http://arvest.com/Encore/Common'
