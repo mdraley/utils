@@ -1,0 +1,7 @@
+cd C:\code\encore\schema
+
+.\fix-all-xsd-prefixes.ps1 `
+  -Roots @("C:\code\encore\schema\Service","C:\code\encore\schema\Root") `
+  -CommonNs  "http://arvest.com/Encore/Common" `
+  -CommonPath "C:\code\encore\schema\Common\common.xsd" `
+  -FixCommonAlso
