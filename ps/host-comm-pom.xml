@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.arvest.encore-api-commons</groupId>
+  <artifactId>host-comm-model</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>HostComm Model (JAXB)</name>
+  <description>Canonical JAXB model generated from normalized HostComm XSDs</description>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <jaxb.plugin.version>4.0.8</jaxb.plugin.version>
+    <jaxb.plugins.version>4.0.8</jaxb.plugins.version>      <!-- XJC extensions -->
+    <jakarta.bind.api.version>4.0.2</jakarta.bind.api.version>
+    <jaxb.runtime.version>4.0.8</jaxb.runtime.version>
+    <schema.dir>${project.basedir}/src/main/resources/schema/host-comm</schema.dir>
+    <gen.dir>${project.build.directory}/generated-sources/jaxb</gen.dir>
+  </properties>
+
+  <build>
+    <plugins>
+      <!-- Generate POJOs from XSDs -->
+      <plugin>
+        <groupId>org.jvnet.jaxb</groupId>
+        <artifactId>jaxb-maven-plugin</artifactId>
+        <version>${jaxb.plugin.version}</version>
+
+        <executions>
+          <!-- CBS namespace -->
+          <execution>
+            <id>generate-cbs</id>
+            <phase>generate-sources</phase>
+            <goals><goal>generate</goal></goals>
+            <configuration>
+              <schemaDirectory>${schema.dir}</schemaDirectory>
+              <schemas>
+                <schema>cbs.xsd</schema>
+              </schemas>
+              <generateDirectory>${gen.dir}</generateDirectory>
+              <generatePackage>com.arvest.encore.hostcomm.cbs</generatePackage>
+
+              <!-- Make -X args work -->
+              <extension>true</extension>
+
+              <!-- XJC arguments -->
+              <args>
+                <arg>-no-header</arg>
+                <arg>-Xequals</arg>
+                <arg>-XhashCode</arg>
+                <arg>-XtoString</arg>
+                <!-- Add more if/when you need them:
+                     <arg>-Xsetters</arg>
+                     <arg>-Xsetters-mode=direct</arg>
+                     <arg>-Xfluent-api</arg>
+                     <arg>-Xvalue-constructor</arg>
+                -->
+              </args>
+
+              <!-- Fail fast, useful during first runs -->
+              <strict>true</strict>
+              <verbose>true</verbose>
+            </configuration>
+          </execution>
+
+          <!-- No-namespace common (canonical) -->
+          <execution>
+            <id>generate-common</id>
+            <phase>generate-sources</phase>
+            <goals><goal>generate</goal></goals>
+            <configuration>
+              <schemaDirectory>${schema.dir}</schemaDirectory>
+              <schemas>
+                <!-- wrapper includes hostcomm-common.xsd -->
+                <schema>hostcomm-common-wrapper.xsd</schema>
+              </schemas>
+              <generateDirectory>${gen.dir}</generateDirectory>
+              <generatePackage>com.arvest.encore.hostcomm.common</generatePackage>
+
+              <extension>true</extension>
+              <args>
+                <arg>-no-header</arg>
+                <arg>-Xequals</arg>
+                <arg>-XhashCode</arg>
+                <arg>-XtoString</arg>
+              </args>
+
+              <strict>true</strict>
+              <verbose>true</verbose>
+            </configuration>
+          </execution>
+        </executions>
+
+        <!-- XJC plugin artifacts for the -X* args -->
+        <dependencies>
+          <!-- Jakarta API visible to XJC -->
+          <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>${jakarta.bind.api.version}</version>
+          </dependency>
+
+          <!-- JAXB Tools plugins (equals/hashCode/toString, setters, copyable, etc.) -->
+          <dependency>
+            <groupId>org.jvnet.jaxb</groupId>
+            <artifactId>jaxb-plugins</artifactId>
+            <version>${jaxb.plugins.version}</version>
+          </dependency>
+
+          <!-- Runtime helpers for equals/hashCode/toString strategies -->
+          <dependency>
+            <groupId>org.jvnet.jaxb</groupId>
+            <artifactId>jaxb-plugins-runtime</artifactId>
+            <version>${jaxb.plugins.version}</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+
+      <!-- Compiler sees generated sources -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <id>add-generated</id>
+            <phase>generate-sources</phase>
+            <goals><goal>add-source</goal></goals>
+            <configuration>
+              <sources>
+                <source>${gen.dir}</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Compile with Java 17 -->
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${maven.compiler.release}</release>
+          <encoding>${project.build.sourceEncoding}</encoding>
+        </configuration>
+      </plugin>
+
+      <!-- Attach a sources jar (nice for downstream devs) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>3.3.0</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals><goal>jar-no-fork</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Optional: keep runtime here so the model jar can be used standalone -->
+  <dependencies>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <version>${jaxb.runtime.version}</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+</project>
