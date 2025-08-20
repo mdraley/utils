@@ -1,0 +1,3 @@
+$OUT = "C:\projects\host-comm-model\src\main\resources\schema\host-comm"
+$RAW = "C:\exports\_no_namespace_merged.xsd"   # your raw export
+.\tools\Make-Hostcomm-Common.ps1 -OutDir $OUT -RawMergedFile $RAW
