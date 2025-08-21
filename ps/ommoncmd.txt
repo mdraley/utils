@@ -1,3 +1,3 @@
-$OUT = "C:\projects\host-comm-model\src\main\resources\schema\host-comm"
-$RAW = "C:\exports\_no_namespace_merged.xsd"   # your raw export
-.\tools\Make-Hostcomm-Common.ps1 -OutDir $OUT -RawMergedFile $RAW
+.\tools\make-binding-for-collisions.ps1 `
+  -XsdPath      "C:\code\encore\encore-api-commons\TSA0-2641\host-comm-model\schema\host-comm\hostcomm.xsd" `
+  -OutBindingPath "C:\code\encore\encore-api-commons\TSA0-2641\host-comm-model\schema\host-comm\binding.xjb"
