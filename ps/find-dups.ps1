@@ -1,130 +1,159 @@
-<# Find-XsdDuplicates.ps1
-   Reports duplicate GLOBAL declarations in an XSD (element, complexType, simpleType,
-   group, attributeGroup, attribute). Works whether the XSD uses a prefix (xs:) or not.
-#>
-
 param(
-  [Parameter(Mandatory = $true)]
-  [string]$XsdPath,
-
-  [Parameter()]
-  [string]$OutCsv
+  [Parameter(Mandatory=$true)]
+  [string]$XsdPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (!(Test-Path -LiteralPath $XsdPath)) { throw "File not found: $XsdPath" }
-
-# Read file once
-$content = Get-Content -LiteralPath $XsdPath -Raw
-$lines = $content -split "`r?`n"
-
-# Build 0-based char index for line starts (for line# mapping)
-$lineStarts = New-Object System.Collections.Generic.List[int]
-$pos = 0
-foreach ($ln in $lines) { $lineStarts.Add($pos) | Out-Null; $pos += ($ln.Length + [Environment]::NewLine.Length) }
-function Get-LineNumber([int]$index) {
-  $lo=0;$hi=$lineStarts.Count-1
-  while($lo -le $hi){ $mid=[int](($lo+$hi)/2)
-    if($lineStarts[$mid] -le $index){
-      if($mid -eq $lineStarts.Count-1 -or $lineStarts[$mid+1] -gt $index){ return $mid+1 }
-      $lo=$mid+1
-    } else { $hi=$mid-1 }
-  }
-  1
+if (!(Test-Path -LiteralPath $XsdPath)) {
+  throw "Not found: $XsdPath"
 }
 
-# ----- Tag pass (optional prefix) to know parentage -----
-# < [/]? [prefix:]? local ( ... ) [/?>]
-$tagRe = [regex]'(?is)<\s*(/)?\s*(?:(?<pref>[A-Za-z_]\w*)\s*:\s*)?(?<local>[A-Za-z_]\w*)([^>]*?)(/)?\s*>'
-$tags = New-Object System.Collections.ArrayList
-foreach ($m in $tagRe.Matches($content)) {
-  $null = $tags.Add([pscustomobject]@{
-    Index     = $m.Index
-    Length    = $m.Length
-    IsClose   = [bool]$m.Groups[1].Value
-    Prefix    = $m.Groups['pref'].Value
-    LocalName = $m.Groups['local'].Value
-    IsSelf    = [bool]$m.Groups[5].Value
+# --- helpers ---------------------------------------------------------------
+
+function Get-LineMap([string]$text) {
+  $starts = New-Object System.Collections.Generic.List[int]
+  $starts.Add(0) | Out-Null
+  for ($i=0; $i -lt $text.Length; $i++) {
+    if ($text[$i] -eq "`n") { $starts.Add($i+1) | Out-Null }
+  }
+  return $starts
+}
+
+function LineCol([System.Collections.Generic.List[int]]$starts, [int]$pos) {
+  # binary search for line start <= pos
+  $lo = 0; $hi = $starts.Count-1
+  while ($lo -le $hi) {
+    $mid = [int](($lo+$hi)/2)
+    if ($starts[$mid] -le $pos) { $lo = $mid + 1 } else { $hi = $mid - 1 }
+  }
+  $line = $hi + 1         # 1-based
+  $col  = $pos - $starts[$hi] + 1
+  [PSCustomObject]@{ Line=$line; Col=$col }
+}
+
+# JAXB-ish simple name conversion: split on non-alnum and case changes
+function To-JaxbName([string]$xmlName) {
+  if ([string]::IsNullOrWhiteSpace($xmlName)) { return $null }
+  $parts = @()
+  $buf = ""
+  for ($i=0; $i -lt $xmlName.Length; $i++) {
+    $ch = $xmlName[$i]
+    if ($ch -match '[A-Za-z0-9]') {
+      # break when a lower->upper transition occurs (XmlWord -> Xml + Word)
+      if ($buf.Length -gt 0 -and
+          $buf[$buf.Length-1] -match '[a-z]' -and
+          $ch -match '[A-Z]') {
+        $parts += ,$buf; $buf = ""
+      }
+      $buf += $ch
+    } else {
+      if ($buf.Length -gt 0) { $parts += ,$buf; $buf = "" }
+    }
+  }
+  if ($buf.Length -gt 0) { $parts += ,$buf }
+
+  # capitalize words and join
+  $cap = $parts | ForEach-Object {
+    if ($_ -match '^[A-Za-z]') { $_.Substring(0,1).ToUpper() + $_.Substring(1) } else { $_ }
+  }
+  ($cap -join '')
+}
+
+# --- scan ------------------------------------------------------------------
+
+$xmlText = Get-Content -LiteralPath $XsdPath -Raw
+$lineMap = Get-LineMap $xmlText
+
+# quick-and-robust parse via regex for *global* declarations under the root schema
+# (this works regardless of the chosen prefix; it looks for :schema and :element/:complexType/:simpleType)
+$schemaOpen  = [regex]'(?is)<\s*([A-Za-z0-9_]+):schema\b'
+$schemaClose = [regex]'(?is)</\s*([A-Za-z0-9_]+):schema\s*>'
+
+$openMatch = $schemaOpen.Match($xmlText)
+if (-not $openMatch.Success) { throw "No <*:schema> found." }
+
+# find the matching close by counting nested <*:schema>
+$prefix = $openMatch.Groups[1].Value
+$depth = 0
+$pos = $openMatch.Index
+$end = $null
+while ($pos -lt $xmlText.Length) {
+  $m1 = $schemaOpen.Match($xmlText, $pos)
+  $m2 = $schemaClose.Match($xmlText, $pos)
+  if ($m2.Success -and ($m1.Success -eq $false -or $m2.Index -lt $m1.Index)) {
+    if ($m2.Groups[1].Value -eq $prefix) {
+      if ($depth -eq 0) { $end = $m2.Index; break } else { $depth-- }
+    }
+    $pos = $m2.Index + $m2.Length
+  } elseif ($m1.Success) {
+    if ($m1.Groups[1].Value -eq $prefix) { $depth++ }
+    $pos = $m1.Index + $m1.Length
+  } else { break }
+}
+if ($end -eq $null) { throw "Could not find </$prefix:schema>." }
+
+# within the top-level schema, pull global element/complexType/simpleType
+$body = $xmlText.Substring($openMatch.Index, $end - $openMatch.Index)
+
+$declRe = [regex]::new("(?is)<\s*$prefix:(element|complexType|simpleType)\b[^>]*\bname\s*=\s*""([^""]+)""", 'IgnoreCase')
+
+$globals = New-Object System.Collections.Generic.List[object]
+
+foreach ($m in $declRe.Matches($body)) {
+  $kind = $m.Groups[1].Value
+  $name = $m.Groups[2].Value
+  $abs  = $openMatch.Index + $m.Index
+  $lc   = LineCol $lineMap $abs
+  $globals.Add([PSCustomObject]@{
+      Kind=$kind; Name=$name; JaxbName=(To-JaxbName $name); Line=$lc.Line; Col=$lc.Col
   })
 }
 
-$stack    = New-Object System.Collections.Stack
-$nodeInfo = @{}
-foreach ($t in $tags) {
-  if ($t.IsClose) { if ($stack.Count) { $null = $stack.Pop() }; continue }
-  $parent = ($stack.Count) ? $stack.Peek() : $null
-  $nodeInfo[$t.Index] = [pscustomobject]@{
-    Index = $t.Index; Prefix = $t.Prefix; Local = $t.LocalName; IsSelf = $t.IsSelf
-    ParentLocal = if ($parent) { $parent.Local } else { $null }
-    ParentPref  = if ($parent) { $parent.Prefix } else { $null }
-    IsDirectChildOfSchema = ($parent -ne $null -and $parent.Local -eq 'schema')
-  }
-  if (-not $t.IsSelf) { $stack.Push([pscustomobject]@{ Prefix=$t.Prefix; Local=$t.LocalName }) }
-}
+if ($globals.Count -eq 0) { Write-Host "No global declarations found."; exit 0 }
 
-# ----- Find global declarations under *:schema (prefix optional) -----
-$declRe = [regex]'(?is)
-  <\s*(?:(?<pref>[A-Za-z_]\w*)\s*:\s*)?
-     (?<kind>complexType|simpleType|element|group|attributeGroup|attribute)\b
-     (?<attrs>[^>]*?)
-  >
-'
+# duplicates by exact XML name within same kind
+$dupes = $globals | Group-Object Kind,Name | Where-Object { $_.Count -gt 1 }
+# potential ObjectFactory collisions (same JAXB name among elements; and among types)
+$elemCollide = $globals | Where-Object {$_.Kind -eq 'element'} |
+               Group-Object JaxbName | Where-Object { $_.Name -ne '' -and $_.Count -gt 1 }
+$typeCollide = $globals | Where-Object {$_.Kind -ne 'element'} |
+               Group-Object JaxbName | Where-Object { $_.Name -ne '' -and $_.Count -gt 1 }
 
-$decls = New-Object System.Collections.Generic.List[object]
-foreach ($m in $declRe.Matches($content)) {
-  $info = $nodeInfo[$m.Index]
-  if ($null -eq $info -or -not $info.IsDirectChildOfSchema) { continue }
+Write-Host ""
+Write-Host "=== Summary for $XsdPath ==="
+Write-Host ("Globals: {0}  (elements: {1}, types: {2})" -f `
+  $globals.Count,
+  ($globals | Where-Object {$_.Kind -eq 'element'}).Count,
+  ($globals | Where-Object {$_.Kind -ne 'element'}).Count)
 
-  $nameMatch = [regex]::Match($m.Groups['attrs'].Value, '(?i)\bname\s*=\s*"([^"]+)"')
-  if (-not $nameMatch.Success) { continue }
-
-  $decls.Add([pscustomobject]@{
-    Kind = $m.Groups['kind'].Value
-    Name = $nameMatch.Groups[1].Value
-    Line = Get-LineNumber $m.Index
-  })
-}
-
-if ($decls.Count -eq 0) {
-  Write-Host "No global declarations found. (Are declarations included from other files? This tool only inspects '$XsdPath'.)"
-  exit 0
-}
-
-# Duplicates (same Kind+Name)
-$dups = $decls | Group-Object Kind, Name | Where-Object { $_.Count -gt 1 } | Sort-Object @{e={$_.Name}}, Count -Descending
-# Cross-kind same Name
-$cross = $decls | Group-Object Name | Where-Object { ($_.Group.Kind | Select-Object -Unique).Count -gt 1 } | Sort-Object Name
-
-"=== Duplicate global declarations (same Kind + same Name) ==="
-if (-not $dups) { "None." } else {
-  foreach ($g in $dups) {
-    $kind,$name = $g.Name -split ',\s*',2
-    " - {0} '{1}' occurs {2} times at lines: {3}" -f $kind,$name,$g.Count, (($g.Group | Sort-Object Line | % Line) -join ', ')
-  }
-}
-
-"`n=== Cross-kind name reuse (same Name across different Kinds) ==="
-if (-not $cross) { "None." } else {
-  foreach ($g in $cross) {
-    $kinds = $g.Group.Kind | Select-Object -Unique
-    if ($kinds.Count -gt 1) {
-      " - Name '{0}' used by kinds: {1}. Lines: {2}" -f $g.Name, ($kinds -join ', '), (($g.Group | Sort-Object Line | % { "$($_.Kind)@L$($_.Line)" }) -join '; ')
+if ($dupes.Count -gt 0) {
+  Write-Host "`n-- Exact duplicate XML names --"
+  foreach ($g in $dupes) {
+    $k,$n = $g.Name -split ','
+    Write-Host ("{0} '{1}' appears {2} times:" -f $k.Trim(), $n.Trim(), $g.Count)
+    $g.Group | Sort-Object Line | ForEach-Object {
+      Write-Host ("   line {0,6} col {1,3}" -f $_.Line,$_.Col)
     }
   }
+} else {
+  Write-Host "`n-- No exact duplicate XML names found."
 }
 
-if ($OutCsv) {
-  $rows = foreach ($g in $dups) {
-    $kind,$name = $g.Name -split ',\s*',2
-    [pscustomobject]@{
-      Kind  = $kind
-      Name  = $name
-      Count = $g.Count
-      Lines = (($g.Group | Sort-Object Line | % Line) -join ', ')
+if ($elemCollide.Count -gt 0 -or $typeCollide.Count -gt 0) {
+  Write-Host "`n-- Potential ObjectFactory name collisions --"
+  foreach ($g in @($elemCollide + $typeCollide)) {
+    Write-Host ("JAXB name '{0}' occurs {1} times:" -f $g.Name,$g.Count)
+    $g.Group | Sort-Object Line | ForEach-Object {
+      Write-Host ("   {0,-12} xml='{1}' @ line {2}" -f $_.Kind, $_.Name, $_.Line)
     }
   }
-  $rows | Export-Csv -NoTypeInformation -Encoding UTF8 -Path $OutCsv
-  "`nWrote CSV -> $OutCsv"
+} else {
+  Write-Host "`n-- No ObjectFactory name collisions detected (with simple JAXB name mapping)."
 }
+
+# Handy: dump a CSV next to the XSD so you can filter/sort in Excel
+$outCsv = [IO.Path]::ChangeExtension($XsdPath, '.globals.csv')
+$globals | Sort-Object Kind, Name | Export-Csv -NoTypeInformation -Encoding UTF8 $outCsv
+Write-Host "`nWrote globals list -> $outCsv"
