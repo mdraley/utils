@@ -1,0 +1,11 @@
+# PowerShell (Windows)
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+# (optional) pip install lxml for nicer line numbers
+pip install lxml
+
+# 1) see duplicates
+python tools/find_collisions.py "C:\code\pojos\src\main\resources\schema\host-comm\hostcomm-common.xsd" --json collisions.json
+
+# 2) fix (context-aware) and write a new file
+python tools/fix_collisions.py "C:\code\pojos\src\main\resources\schema\host-comm\hostcomm-common.xsd" -o "C:\code\pojos\src\main\resources\schema\host-comm\hostcomm-common-fixed.xsd"
