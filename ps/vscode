@@ -1,0 +1,23 @@
+code --install-extension vscjava.vscode-java-pack
+code --install-extension vscjava.vscode-spring-initializr
+code --install-extension vscjava.vscode-spring-boot-dashboard
+code --install-extension redhat.java
+code --install-extension vscjava.vscode-maven
+
+code --install-extension ms-vscode.vscode-typescript-next
+code --install-extension dbaeumer.vscode-eslint
+code --install-extension esbenp.prettier-vscode
+code --install-extension bradlc.vscode-tailwindcss
+
+code --install-extension github.copilot
+code --install-extension github.copilot-chat
+code --install-extension github.vscode-pull-request-github
+code --install-extension github.vscode-github-actions
+
+code --install-extension ms-azuretools.vscode-docker
+code --install-extension ms-vscode-remote.remote-wsl
+code --install-extension ms-vscode-remote.remote-containers
+
+code --install-extension usernamehw.errorlens
+code --install-extension gruntfuggly.todo-tree
+code --install-extension streetsidesoftware.code-spell-checker
