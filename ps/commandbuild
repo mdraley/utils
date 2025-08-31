@@ -1,0 +1,5 @@
+cd C:\util
+Set-ExecutionPolicy Bypass -Scope Process -Force
+Unblock-File .\bootstrap-dev.ps1
+.\bootstrap-dev.ps1 -InventoryOnly    # quick check (should print booleans fast)
+.\bootstrap-dev.ps1                   # perform installs (idempotent)
