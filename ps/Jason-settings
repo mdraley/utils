@@ -1,0 +1,32 @@
+{
+  "workbench.startupEditor": "none",
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // Java & Spring
+  "java.configuration.runtimes": [
+    { "name": "JavaSE-21", "path": "C:\\Program Files\\Microsoft\\jdk-21" }
+  ],
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "spring-boot.ls.java.home": "C:\\Program Files\\Microsoft\\jdk-21",
+
+  // TypeScript & React
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "prettier.singleQuote": true,
+  "prettier.trailingComma": "all",
+
+  // Copilot
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": true,
+    "markdown": true
+  },
+  "github.copilot.suggestions.showMethods": true
+}
