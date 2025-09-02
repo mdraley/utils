@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jxb:bindings
+    xmlns:jxb="https://jakarta.ee/xml/ns/jaxb"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    version="3.0">
+
+  <!-- Apply to the schema whose targetNamespace is http://www.fiserv.com/cbs -->
+  <jxb:bindings node="//xs:schema[@targetNamespace='http://www.fiserv.com/cbs']">
+
+    <!-- Bind CBS namespace to a stable Java package -->
+    <jxb:schemaBindings>
+      <jxb:package name="com.fiserv.cbs"/>
+      <!-- Optional: tweak name mangling (safe defaults) -->
+      <jxb:nameXmlTransform>
+        <!-- keep element names as-is; add class/name transforms here if ever needed -->
+      </jxb:nameXmlTransform>
+    </jxb:schemaBindings>
+
+    <!-- Global defaults for this namespace -->
+    <jxb:globalBindings
+        generateElementProperty="true"
+        typesafeEnumBase="xs:string"
+        underscoreBinding="asCharInWord"
+        fixedAttributeAsConstantProperty="true"/>
+
+    <!-- Make generated classes Serializable (use your preferred UID policy) -->
+    <jxb:serializable uid="1"/>
+
+  </jxb:bindings>
+</jxb:bindings>
